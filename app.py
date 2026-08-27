@@ -5,6 +5,7 @@ import folium
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from folium.plugins import Fullscreen, MousePosition
 from streamlit_folium import st_folium
 
 
@@ -245,7 +246,7 @@ with tab_map:
 
     st.divider()
     st.subheader("Interactive Barangay-Level Thematic Map")
-    control_1, control_2 = st.columns(2)
+    control_1, control_2, control_3 = st.columns(3)
     indicator = control_1.selectbox(
         "Indicator",
         ["Infestation Priority Index", "Report Frequency", "Affected Area (ha)", "Mean Damage (%)"],
@@ -255,6 +256,12 @@ with tab_map:
         "Barangay profile",
         ["All barangays"] + sorted(df["Barangay"].tolist()),
         key="interactive_barangay",
+    )
+    map_extent = control_3.selectbox(
+        "Map extent",
+        ["Municipal context", "Norala barangays"],
+        help="Municipal context displays neighboring municipalities for geographic reference.",
+        key="interactive_map_extent",
     )
     field_map = {
         "Infestation Priority Index": "IPI",
@@ -294,18 +301,28 @@ with tab_map:
     title, items = legends[indicator]
     st.markdown(legend_html(title, items), unsafe_allow_html=True)
 
-    # Boundary-only canvas with no external tile service or tile watermark.
+    # OpenStreetMap supplies municipal labels, roads, and surrounding geographic context
+    # without requiring an API key. Its required attribution remains visible.
     map_obj = folium.Map(
         location=[6.52, 124.65],
-        zoom_start=12,
-        tiles=None,
-        attribution_control=False,
+        zoom_start=11,
+        tiles="OpenStreetMap",
+        attribution_control=True,
         control_scale=True,
         prefer_canvas=True,
     )
-    map_obj.get_root().html.add_child(
-        folium.Element("<style>.leaflet-container{background:#f4f7f2 !important;}</style>")
-    )
+    Fullscreen(
+        position="topleft",
+        title="Open full-screen map",
+        title_cancel="Exit full-screen map",
+        force_separate_button=True,
+    ).add_to(map_obj)
+    MousePosition(
+        position="bottomright",
+        separator=" | ",
+        prefix="Coordinates:",
+        num_digits=5,
+    ).add_to(map_obj)
 
     def style_function(feature):
         value = float(feature["properties"].get(selected_field, 0) or 0)
@@ -322,8 +339,8 @@ with tab_map:
             sticky=True,
         ),
         popup=folium.GeoJsonPopup(
-            fields=["NAME_3", "Total_Repo", "Affected_A", "Severity", "IPI", "Priority", "IPI_Rank"],
-            aliases=["Barangay", "Reports", "Affected area (ha)", "Mean damage (%)", "IPI", "Priority", "IPI rank"],
+            fields=["NAME_3", "NAME_2", "NAME_1", "Total_Repo", "Affected_A", "Severity", "IPI", "Priority", "IPI_Rank"],
+            aliases=["Barangay", "Municipality", "Province", "Reports", "Affected area (ha)", "Mean damage (%)", "IPI", "Priority", "IPI rank"],
             localize=True,
             labels=True,
             style="background-color: white;",
@@ -338,13 +355,24 @@ with tab_map:
             for ring in polygon:
                 coordinates.extend([[lat, lon] for lon, lat in ring])
     if coordinates:
-        map_obj.fit_bounds([[min(x[0] for x in coordinates), min(x[1] for x in coordinates)],
-                            [max(x[0] for x in coordinates), max(x[1] for x in coordinates)]])
+        min_lat = min(x[0] for x in coordinates)
+        max_lat = max(x[0] for x in coordinates)
+        min_lon = min(x[1] for x in coordinates)
+        max_lon = max(x[1] for x in coordinates)
+        if map_extent == "Municipal context":
+            # Expand beyond Norala so nearby municipalities and transport routes remain visible.
+            lat_margin = max((max_lat - min_lat) * 0.75, 0.08)
+            lon_margin = max((max_lon - min_lon) * 0.75, 0.10)
+            bounds = [[min_lat - lat_margin, min_lon - lon_margin],
+                      [max_lat + lat_margin, max_lon + lon_margin]]
+        else:
+            bounds = [[min_lat, min_lon], [max_lat, max_lon]]
+        map_obj.fit_bounds(bounds, padding=(18, 18))
     st_folium(
         map_obj,
         height=610,
         use_container_width=True,
-        key=f"interactive_map_{selected_field}_{selected_barangay}",
+        key=f"interactive_map_{selected_field}_{selected_barangay}_{map_extent}",
         returned_objects=["last_object_clicked", "last_object_clicked_popup"],
     )
 
@@ -364,7 +392,8 @@ with tab_map:
         st.info("Click a barangay polygon to open its map popup, or select a barangay above for a persistent profile.")
     st.caption(
         "The map displays relative barangay-level monitoring priorities from available August 2025 MAO reports. "
-        "It must not be interpreted as a farm-level infestation map or a statistically confirmed biological hotspot map."
+        "Neighboring municipalities are displayed only as geographic context and have no AEGIS infestation values. "
+        "The map must not be interpreted as a farm-level infestation map or a statistically confirmed biological hotspot map."
     )
 
 
