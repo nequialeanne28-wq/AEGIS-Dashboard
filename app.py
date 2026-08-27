@@ -310,7 +310,6 @@ with tab_map:
         tiles="OpenStreetMap",
         attribution_control=True,
         control_scale=True,
-        prefer_canvas=True,
     )
     Fullscreen(
         position="topleft",
@@ -348,32 +347,15 @@ with tab_map:
         ),
     )
     geojson_layer.add_to(map_obj)
-    coordinates = []
-    for feature in geojson_data["features"]:
-        geometry = feature["geometry"]
-        polygons = [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
-        for polygon in polygons:
-            for ring in polygon:
-                coordinates.extend([[lat, lon] for lon, lat in ring])
-    if coordinates:
-        min_lat = min(x[0] for x in coordinates)
-        max_lat = max(x[0] for x in coordinates)
-        min_lon = min(x[1] for x in coordinates)
-        max_lon = max(x[1] for x in coordinates)
-        if map_extent == "Municipal context":
-            # Expand beyond Norala so nearby municipalities and transport routes remain visible.
-            lat_margin = max((max_lat - min_lat) * 0.75, 0.08)
-            lon_margin = max((max_lon - min_lon) * 0.75, 0.10)
-            bounds = [[min_lat - lat_margin, min_lon - lon_margin],
-                      [max_lat + lat_margin, max_lon + lon_margin]]
-        else:
-            bounds = [[min_lat, min_lon], [max_lat, max_lon]]
-        map_obj.fit_bounds(bounds, padding=(18, 18))
+    map_center = [6.5262, 124.6784]
+    map_zoom = 10 if map_extent == "Municipal context" else 12
     st_folium(
         map_obj,
+        center=map_center,
+        zoom=map_zoom,
         height=610,
         use_container_width=True,
-        key=f"interactive_map_{selected_field}_{selected_barangay}_{map_extent}",
+        key=f"interactive_map_v3_{selected_field}_{selected_barangay}_{map_extent}",
         returned_objects=["last_object_clicked", "last_object_clicked_popup"],
     )
 
