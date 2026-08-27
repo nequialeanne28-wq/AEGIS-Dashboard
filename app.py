@@ -294,7 +294,18 @@ with tab_map:
     title, items = legends[indicator]
     st.markdown(legend_html(title, items), unsafe_allow_html=True)
 
-    map_obj = folium.Map(location=[6.52, 124.65], zoom_start=12, tiles="CartoDB positron")
+    # Boundary-only canvas: no CARTO tiles, API key, external basemap, or tile watermark.
+    map_obj = folium.Map(
+        location=[6.52, 124.65],
+        zoom_start=12,
+        tiles=None,
+        attribution_control=False,
+        control_scale=True,
+        prefer_canvas=True,
+    )
+    map_obj.get_root().html.add_child(
+        folium.Element("<style>.leaflet-container{background:#f4f7f2 !important;}</style>")
+    )
 
     def style_function(feature):
         value = float(feature["properties"].get(selected_field, 0) or 0)
