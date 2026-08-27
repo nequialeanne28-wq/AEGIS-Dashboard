@@ -76,14 +76,20 @@ def priority_label(value, reported=True):
 def class_color(value, field):
     if value <= 0:
         return COLORS["none"]
+    if field == "IPI":
+        if value < 0.21:
+            return COLORS["low"]
+        if value < 0.41:
+            return COLORS["moderate"]
+        if value < 0.61:
+            return COLORS["high"]
+        return COLORS["very_high"]
     if field == "Total_Repo":
         limits = (5, 10, 20)
     elif field == "Affected_A":
         limits = (7, 15, 30)
     elif field == "Severity":
         limits = (20, 40, 60)
-    else:
-        limits = (0.21, 0.41, 0.61)
     if value <= limits[0]:
         return COLORS["low"]
     if value <= limits[1]:
@@ -294,10 +300,11 @@ with tab_map:
         ),
         "Infestation Priority Index": (
             "Relative monitoring priority (IPI)",
-            [(COLORS["none"], "No report"), (COLORS["low"], "Low (0.000–<0.210)"),
-             (COLORS["moderate"], "Moderate (0.210–<0.410)"),
-             (COLORS["high"], "High (0.410–<0.610)"),
-             (COLORS["very_high"], "Very High (0.610–1.000)")],
+            [(COLORS["none"], "No reported infestation (No report)"),
+             (COLORS["low"], "Low (0.000000 ≤ IPI < 0.210000)"),
+             (COLORS["moderate"], "Moderate (0.210000 ≤ IPI < 0.410000)"),
+             (COLORS["high"], "High (0.410000 ≤ IPI < 0.610000)"),
+             (COLORS["very_high"], "Very High (0.610000 ≤ IPI ≤ 1.000000)")],
         ),
     }
     title, items = legends[indicator]
