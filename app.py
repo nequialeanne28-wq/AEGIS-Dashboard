@@ -18,6 +18,12 @@ COLORS = {
     "very_high": "#cb181d",
 }
 
+STATIC_MAPS = {
+    "Report Frequency": Path(__file__).with_name("assets") / "report_frequency_map.png",
+    "Mean Percentage Damage": Path(__file__).with_name("assets") / "mean_damage_map.png",
+    "Infestation Priority Index": Path(__file__).with_name("assets") / "ipi_priority_map.png",
+}
+
 st.markdown(
     """
     <style>
@@ -30,6 +36,8 @@ st.markdown(
     .warning {border-left-color:#b7791f; background:#fffaf0;}
     .priority-card {border:1px solid #d8e2da; border-radius:12px; padding:1rem;
                     background:white; min-height:170px;}
+    .map-details {border:1px solid #d8e2da; border-radius:12px; padding:1rem;
+                  background:#fbfdfb; margin:.6rem 0 1rem;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -56,11 +64,11 @@ def minmax(series):
 def priority_label(value, reported=True):
     if not reported:
         return "No report"
-    if value < 0.25:
+    if value < 0.21:
         return "Low"
-    if value < 0.50:
+    if value < 0.41:
         return "Moderate"
-    if value < 0.75:
+    if value < 0.61:
         return "High"
     return "Very High"
 
@@ -75,7 +83,7 @@ def class_color(value, field):
     elif field == "Severity":
         limits = (20, 40, 60)
     else:
-        limits = (0.25, 0.50, 0.75)
+        limits = (0.21, 0.41, 0.61)
     if value <= limits[0]:
         return COLORS["low"]
     if value <= limits[1]:
@@ -208,10 +216,45 @@ with tab_overview:
 
 
 with tab_map:
-    st.header("Interactive Barangay-Level Thematic Map")
-    indicator = st.selectbox(
+    st.header("Spatial Evidence")
+    st.markdown(
+        "The static maps present the principal barangay-level GIS outputs prepared for the study. "
+        "The interactive map below allows users to compare indicators and inspect individual barangays."
+    )
+
+    static_choice = st.radio(
+        "Static research map",
+        list(STATIC_MAPS),
+        horizontal=True,
+        key="static_spatial_map",
+    )
+    static_captions = {
+        "Report Frequency": "Barangay distribution of documented rice stem borer reports.",
+        "Mean Percentage Damage": "Barangay distribution of reported mean percentage damage.",
+        "Infestation Priority Index": "Combined barangay monitoring priorities based on the IPI.",
+    }
+    st.image(
+        str(STATIC_MAPS[static_choice]),
+        caption=static_captions[static_choice],
+        use_container_width=True,
+    )
+    st.caption(
+        "Static maps are barangay-level summaries. White areas indicate no documented report in the "
+        "available dataset and do not confirm absence of rice stem borer infestation."
+    )
+
+    st.divider()
+    st.subheader("Interactive Barangay-Level Thematic Map")
+    control_1, control_2 = st.columns(2)
+    indicator = control_1.selectbox(
         "Indicator",
         ["Infestation Priority Index", "Report Frequency", "Affected Area (ha)", "Mean Damage (%)"],
+        key="interactive_indicator",
+    )
+    selected_barangay = control_2.selectbox(
+        "Barangay profile",
+        ["All barangays"] + sorted(df["Barangay"].tolist()),
+        key="interactive_barangay",
     )
     field_map = {
         "Infestation Priority Index": "IPI",
@@ -242,10 +285,10 @@ with tab_map:
         ),
         "Infestation Priority Index": (
             "Relative monitoring priority (IPI)",
-            [(COLORS["none"], "No report"), (COLORS["low"], "Low (0.00–<0.25)"),
-             (COLORS["moderate"], "Moderate (0.25–<0.50)"),
-             (COLORS["high"], "High (0.50–<0.75)"),
-             (COLORS["very_high"], "Very High (0.75–1.00)")],
+            [(COLORS["none"], "No report"), (COLORS["low"], "Low (0.000–<0.210)"),
+             (COLORS["moderate"], "Moderate (0.210–<0.410)"),
+             (COLORS["high"], "High (0.410–<0.610)"),
+             (COLORS["very_high"], "Very High (0.610–1.000)")],
         ),
     }
     title, items = legends[indicator]
@@ -257,7 +300,7 @@ with tab_map:
         value = float(feature["properties"].get(selected_field, 0) or 0)
         return {"fillColor": class_color(value, selected_field), "color": "#303030", "weight": 1.1, "fillOpacity": 0.82}
 
-    folium.GeoJson(
+    geojson_layer = folium.GeoJson(
         geojson_data,
         name=indicator,
         style_function=style_function,
@@ -267,7 +310,15 @@ with tab_map:
             aliases=["Barangay:", "Reports:", "Affected area (ha):", "Mean damage (%):", "IPI:", "Priority:", "IPI rank:"],
             sticky=True,
         ),
-    ).add_to(map_obj)
+        popup=folium.GeoJsonPopup(
+            fields=["NAME_3", "Total_Repo", "Affected_A", "Severity", "IPI", "Priority", "IPI_Rank"],
+            aliases=["Barangay", "Reports", "Affected area (ha)", "Mean damage (%)", "IPI", "Priority", "IPI rank"],
+            localize=True,
+            labels=True,
+            style="background-color: white;",
+        ),
+    )
+    geojson_layer.add_to(map_obj)
     coordinates = []
     for feature in geojson_data["features"]:
         geometry = feature["geometry"]
@@ -278,7 +329,28 @@ with tab_map:
     if coordinates:
         map_obj.fit_bounds([[min(x[0] for x in coordinates), min(x[1] for x in coordinates)],
                             [max(x[0] for x in coordinates), max(x[1] for x in coordinates)]])
-    st_folium(map_obj, height=610, use_container_width=True)
+    st_folium(
+        map_obj,
+        height=610,
+        use_container_width=True,
+        key=f"interactive_map_{selected_field}_{selected_barangay}",
+        returned_objects=["last_object_clicked", "last_object_clicked_popup"],
+    )
+
+    if selected_barangay != "All barangays":
+        profile = df.loc[df["Barangay"] == selected_barangay].iloc[0]
+        rank_text = int(profile["IPI Rank"]) if pd.notna(profile["IPI Rank"]) else "—"
+        st.markdown(
+            f'<div class="map-details"><b>{selected_barangay}</b><br>'
+            f'Reports: {int(profile["Report Frequency"])} &nbsp;|&nbsp; '
+            f'Affected area: {profile["Affected Area (ha)"]:.2f} ha &nbsp;|&nbsp; '
+            f'Mean damage: {profile["Mean Damage (%)"]:.2f}%<br>'
+            f'IPI: {profile["IPI"]:.3f} &nbsp;|&nbsp; Priority: {profile["Priority"]} &nbsp;|&nbsp; '
+            f'Rank: {rank_text}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info("Click a barangay polygon to open its map popup, or select a barangay above for a persistent profile.")
     st.caption(
         "The map displays relative barangay-level monitoring priorities from available August 2025 MAO reports. "
         "It must not be interpreted as a farm-level infestation map or a statistically confirmed biological hotspot map."
