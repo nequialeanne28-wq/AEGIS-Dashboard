@@ -101,8 +101,10 @@ def legend_html(title, items):
         f'display:inline-block;margin-right:9px"></span>{label}</div>'
         for color, label in items
     )
-    return f'<div style="border:1px solid #ccd5ce;border-radius:9px;padding:12px">'
-    f'<b>{title}</b>{rows}</div>'
+    return (
+        f'<div style="border:1px solid #ccd5ce;border-radius:9px;padding:12px;background:#fff">'
+        f'<b>{title}</b>{rows}</div>'
+    )
 
 
 geojson_data = load_geojson()
@@ -321,6 +323,7 @@ with tab_map:
         position="bottomright",
         separator=" | ",
         prefix="Coordinates:",
+        empty_string="Move pointer over map",
         num_digits=5,
     ).add_to(map_obj)
 
