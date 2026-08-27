@@ -133,6 +133,7 @@ for feature in geojson_data["features"]:
     record = lookup[name]
     feature["properties"].update(
         {
+            "Location": "Norala, South Cotabato",
             "IPI": round(record["IPI"], 6),
             "Priority": record["Priority"],
             "IPI_Rank": int(record["IPI Rank"]) if pd.notna(record["IPI Rank"]) else "—",
@@ -339,8 +340,8 @@ with tab_map:
             sticky=True,
         ),
         popup=folium.GeoJsonPopup(
-            fields=["NAME_3", "NAME_2", "NAME_1", "Total_Repo", "Affected_A", "Severity", "IPI", "Priority", "IPI_Rank"],
-            aliases=["Barangay", "Municipality", "Province", "Reports", "Affected area (ha)", "Mean damage (%)", "IPI", "Priority", "IPI rank"],
+            fields=["NAME_3", "Location", "Total_Repo", "Affected_A", "Severity", "IPI", "Priority", "IPI_Rank"],
+            aliases=["Barangay", "Municipality and province", "Reports", "Affected area (ha)", "Mean damage (%)", "IPI", "Priority", "IPI rank"],
             localize=True,
             labels=True,
             style="background-color: white;",
