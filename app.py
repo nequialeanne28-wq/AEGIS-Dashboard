@@ -294,7 +294,7 @@ with tab_map:
     title, items = legends[indicator]
     st.markdown(legend_html(title, items), unsafe_allow_html=True)
 
-    # Boundary-only canvas: no CARTO tiles, API key, external basemap, or tile watermark.
+    # Boundary-only canvas: no external tiles, API key, or tile watermark.
     map_obj = folium.Map(
         location=[6.52, 124.65],
         zoom_start=12,
