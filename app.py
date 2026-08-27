@@ -262,7 +262,7 @@ with tab_map:
     )
     map_extent = control_3.selectbox(
         "Map extent",
-        ["Municipal context", "Norala barangays"],
+        ["Norala barangays", "Municipal context"],
         help="Municipal context displays neighboring municipalities for geographic reference.",
         key="interactive_map_extent",
     )
@@ -380,36 +380,36 @@ with tab_map:
                 points.extend(feature_coordinates(child))
         return points
 
-    label_size = "9px" if map_extent == "Municipal context" else "11px"
-    for feature in geojson_data["features"]:
-        points = feature_coordinates(feature["geometry"]["coordinates"])
-        if not points:
-            continue
-        min_lon = min(point[0] for point in points)
-        max_lon = max(point[0] for point in points)
-        min_lat = min(point[1] for point in points)
-        max_lat = max(point[1] for point in points)
-        properties = feature["properties"]
-        name = properties["NAME_3"]
-        value_line = (
-            f'<br><span style="font-size:0.9em;font-weight:600">{float(properties["IPI"]):.3f}</span>'
-            if indicator == "Infestation Priority Index"
-            else ""
-        )
-        folium.Marker(
-            location=[(min_lat + max_lat) / 2, (min_lon + max_lon) / 2],
-            icon=folium.DivIcon(
-                icon_size=(110, 32),
-                icon_anchor=(55, 16),
-                html=(
-                    f'<div style="width:110px;text-align:center;white-space:nowrap;'
-                    f'font-size:{label_size};font-weight:800;color:#17202a;line-height:1.05;'
-                    f'text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,'
-                    f'1px 1px 0 #fff">{name}{value_line}</div>'
+    if map_extent == "Norala barangays":
+        for feature in geojson_data["features"]:
+            points = feature_coordinates(feature["geometry"]["coordinates"])
+            if not points:
+                continue
+            min_lon = min(point[0] for point in points)
+            max_lon = max(point[0] for point in points)
+            min_lat = min(point[1] for point in points)
+            max_lat = max(point[1] for point in points)
+            properties = feature["properties"]
+            name = properties["NAME_3"]
+            value_line = (
+                f'<br><span style="font-size:0.9em;font-weight:600">{float(properties["IPI"]):.3f}</span>'
+                if indicator == "Infestation Priority Index"
+                else ""
+            )
+            folium.Marker(
+                location=[(min_lat + max_lat) / 2, (min_lon + max_lon) / 2],
+                icon=folium.DivIcon(
+                    icon_size=(110, 32),
+                    icon_anchor=(55, 16),
+                    html=(
+                        f'<div style="width:110px;text-align:center;white-space:nowrap;'
+                        f'font-size:11px;font-weight:800;color:#17202a;line-height:1.05;'
+                        f'text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,'
+                        f'1px 1px 0 #fff">{name}{value_line}</div>'
+                    ),
                 ),
-            ),
-            tooltip=f"{name}: IPI {float(properties['IPI']):.3f}",
-        ).add_to(map_obj)
+                tooltip=f"{name}: IPI {float(properties['IPI']):.3f}",
+            ).add_to(map_obj)
 
     map_center = [6.5262, 124.6784]
     map_zoom = 10 if map_extent == "Municipal context" else 12
@@ -419,7 +419,7 @@ with tab_map:
         zoom=map_zoom,
         height=610,
         use_container_width=True,
-        key=f"interactive_map_v4_{selected_field}_{selected_barangay}_{map_extent}",
+        key=f"interactive_map_v5_{selected_field}_{selected_barangay}_{map_extent}",
         returned_objects=["last_object_clicked", "last_object_clicked_popup"],
     )
 
