@@ -45,7 +45,6 @@ st.markdown(
 )
 
 
-@st.cache_data
 def load_geojson():
     path = Path(__file__).with_name("norala_barangay.geojson")
     with path.open(encoding="utf-8") as handle:
