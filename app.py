@@ -326,13 +326,13 @@ with tab_map:
 
     def style_function(feature):
         value = float(feature["properties"].get(selected_field, 0) or 0)
-        return {"fillColor": class_color(value, selected_field), "color": "#303030", "weight": 1.1, "fillOpacity": 0.82}
+        return {"fillColor": class_color(value, selected_field), "color": "#20262e", "weight": 1.35, "fillOpacity": 0.62}
 
     geojson_layer = folium.GeoJson(
         geojson_data,
         name=indicator,
         style_function=style_function,
-        highlight_function=lambda _: {"weight": 3, "color": "#111", "fillOpacity": 0.93},
+        highlight_function=lambda _: {"weight": 3, "color": "#111", "fillOpacity": 0.80},
         tooltip=folium.GeoJsonTooltip(
             fields=["NAME_3", "Total_Repo", "Affected_A", "Severity", "IPI", "Priority", "IPI_Rank"],
             aliases=["Barangay:", "Reports:", "Affected area (ha):", "Mean damage (%):", "IPI:", "Priority:", "IPI rank:"],
