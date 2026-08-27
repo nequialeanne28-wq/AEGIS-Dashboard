@@ -327,6 +327,21 @@ with tab_map:
         num_digits=5,
     ).add_to(map_obj)
 
+    # Mask labels embedded in the basemap within Norala. The AEGIS layer below
+    # supplies its own barangay names from the research boundary dataset.
+    folium.GeoJson(
+        geojson_data,
+        name="Norala label mask",
+        style_function=lambda _: {
+            "fillColor": "#ffffff",
+            "color": "#ffffff",
+            "weight": 0,
+            "fillOpacity": 1.0,
+        },
+        interactive=False,
+        control=False,
+    ).add_to(map_obj)
+
     def style_function(feature):
         value = float(feature["properties"].get(selected_field, 0) or 0)
         return {"fillColor": class_color(value, selected_field), "color": "#20262e", "weight": 1.35, "fillOpacity": 0.62}
@@ -350,6 +365,52 @@ with tab_map:
         ),
     )
     geojson_layer.add_to(map_obj)
+
+    def feature_coordinates(node):
+        if (
+            isinstance(node, list)
+            and len(node) >= 2
+            and isinstance(node[0], (int, float))
+            and isinstance(node[1], (int, float))
+        ):
+            return [(float(node[0]), float(node[1]))]
+        points = []
+        if isinstance(node, list):
+            for child in node:
+                points.extend(feature_coordinates(child))
+        return points
+
+    label_size = "9px" if map_extent == "Municipal context" else "11px"
+    for feature in geojson_data["features"]:
+        points = feature_coordinates(feature["geometry"]["coordinates"])
+        if not points:
+            continue
+        min_lon = min(point[0] for point in points)
+        max_lon = max(point[0] for point in points)
+        min_lat = min(point[1] for point in points)
+        max_lat = max(point[1] for point in points)
+        properties = feature["properties"]
+        name = properties["NAME_3"]
+        value_line = (
+            f'<br><span style="font-size:0.9em;font-weight:600">{float(properties["IPI"]):.3f}</span>'
+            if indicator == "Infestation Priority Index"
+            else ""
+        )
+        folium.Marker(
+            location=[(min_lat + max_lat) / 2, (min_lon + max_lon) / 2],
+            icon=folium.DivIcon(
+                icon_size=(110, 32),
+                icon_anchor=(55, 16),
+                html=(
+                    f'<div style="width:110px;text-align:center;white-space:nowrap;'
+                    f'font-size:{label_size};font-weight:800;color:#17202a;line-height:1.05;'
+                    f'text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,'
+                    f'1px 1px 0 #fff">{name}{value_line}</div>'
+                ),
+            ),
+            tooltip=f"{name}: IPI {float(properties['IPI']):.3f}",
+        ).add_to(map_obj)
+
     map_center = [6.5262, 124.6784]
     map_zoom = 10 if map_extent == "Municipal context" else 12
     st_folium(
@@ -358,7 +419,7 @@ with tab_map:
         zoom=map_zoom,
         height=610,
         use_container_width=True,
-        key=f"interactive_map_v3_{selected_field}_{selected_barangay}_{map_extent}",
+        key=f"interactive_map_v4_{selected_field}_{selected_barangay}_{map_extent}",
         returned_objects=["last_object_clicked", "last_object_clicked_popup"],
     )
 
@@ -378,6 +439,7 @@ with tab_map:
         st.info("Click a barangay polygon to open its map popup, or select a barangay above for a persistent profile.")
     st.caption(
         "The map displays relative barangay-level monitoring priorities from available August 2025 MAO reports. "
+        "Names inside Norala follow the AEGIS research boundary layer; OpenStreetMap is used only for surrounding geographic context. "
         "Neighboring municipalities are displayed only as geographic context and have no AEGIS infestation values. "
         "The map must not be interpreted as a farm-level infestation map or a statistically confirmed biological hotspot map."
     )
