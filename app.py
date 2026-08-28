@@ -112,6 +112,44 @@ def legend_html(title, items):
     )
 
 
+def render_navigation_guide():
+    st.markdown(
+        """
+        **Navigate AEGIS in three steps**
+
+        1. **Review the Overview** to understand the main findings and normalized indicator profiles.
+        2. **Open Spatial Evidence** to choose a map, inspect a barangay, and compare report frequency,
+           affected area, mean damage, and IPI.
+        3. **Use Decision Support** to review the proposed field-visit sequence, then check
+           **Validation & Robustness** before downloading data from **Data & Methods**.
+
+        **Important tools and their purpose**
+
+        | Tool | Purpose |
+        |---|---|
+        | Page tabs | Move between findings, maps, operational guidance, validation, and methods. |
+        | Map or indicator selector | Change the evidence displayed on the map. |
+        | Barangay profile or map click | View a barangay's reports, affected area, mean damage, IPI, priority, and rank. |
+        | Map extent and full-screen control | Focus on Norala or view neighboring municipalities for geographic context. |
+        | Available field visits slider | Produce a proposed visit sequence using the primary IPI ranking. |
+        | Indicator-weight sliders | Explore how priorities change under a custom sensitivity scenario. |
+        | CSV download | Export the barangay summary for reporting or further checking. |
+        """
+    )
+    st.info(
+        "Use the IPI to decide which barangays may need earlier follow-up. It is a relative "
+        "monitoring-priority score, not a forecast, pesticide recommendation, or substitute for field assessment."
+    )
+
+
+@st.dialog("Welcome to AEGIS", width="large")
+def show_welcome_tutorial():
+    st.caption("A 60-second guide to the dashboard")
+    render_navigation_guide()
+    if st.button("Start exploring AEGIS", type="primary", use_container_width=True):
+        st.rerun()
+
+
 geojson_data = load_geojson()
 rows = []
 for feature in geojson_data["features"]:
@@ -166,6 +204,19 @@ with st.sidebar:
     st.divider()
     st.caption("Infestation data: Municipal Agriculture Office, Norala")
     st.caption("Boundary: GADM 4.1, WGS 84 (indicative)")
+    st.divider()
+    tutorial_requested = st.button(
+        "🧭 Open quick tutorial",
+        use_container_width=True,
+        help="Reopen the navigation guide and tool-purpose summary.",
+    )
+
+
+first_visit = "aegis_tutorial_seen" not in st.session_state
+if first_visit:
+    st.session_state["aegis_tutorial_seen"] = True
+if first_visit or tutorial_requested:
+    show_welcome_tutorial()
 
 
 st.markdown(
@@ -176,12 +227,16 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+with st.expander("🧭 Quick navigation and tool purposes"):
+    render_navigation_guide()
+
 tab_overview, tab_map, tab_decision, tab_validation, tab_data = st.tabs(
     ["Overview", "Spatial Evidence", "Decision Support", "Validation & Robustness", "Data & Methods"]
 )
 
 
 with tab_overview:
+    st.caption("Purpose: Summarize the documented burden and explain why the three indicators are combined.")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Validated MAO records", f"{int(df['Report Frequency'].sum())}")
     c2.metric("Reported affected area", f"{df['Affected Area (ha)'].sum():.2f} ha")
@@ -226,6 +281,7 @@ with tab_overview:
 
 with tab_map:
     st.header("Spatial Evidence")
+    st.caption("Purpose: Compare barangay-level spatial evidence and inspect the values behind each map.")
     st.markdown(
         "The static maps present the principal barangay-level GIS outputs prepared for the study. "
         "The interactive map below allows users to compare indicators and inspect individual barangays."
@@ -236,6 +292,7 @@ with tab_map:
         list(STATIC_MAPS),
         horizontal=True,
         key="static_spatial_map",
+        help="Switch among the static research maps used to present the principal spatial findings.",
     )
     static_captions = {
         "Report Frequency": "Barangay distribution of documented rice stem borer reports.",
@@ -259,11 +316,13 @@ with tab_map:
         "Indicator",
         ["Infestation Priority Index", "Report Frequency", "Affected Area (ha)", "Mean Damage (%)"],
         key="interactive_indicator",
+        help="Changes the values and color classes displayed on the interactive map.",
     )
     selected_barangay = control_2.selectbox(
         "Barangay profile",
         ["All barangays"] + sorted(df["Barangay"].tolist()),
         key="interactive_barangay",
+        help="Displays a persistent evidence profile for the selected barangay below the map.",
     )
     map_extent = control_3.selectbox(
         "Map extent",
@@ -453,6 +512,7 @@ with tab_map:
 
 with tab_decision:
     st.header("Monitoring Prioritization and Field-Assessment Support")
+    st.caption("Purpose: Translate the primary IPI ranking into monitoring and field-validation support.")
     st.markdown(
         "The priority ranking is intended to guide the sequence and intensity of follow-up monitoring. "
         "It does not automatically prescribe pesticide application or confirm present infestation."
@@ -487,7 +547,13 @@ with tab_decision:
     st.dataframe(pd.DataFrame(action_rows), hide_index=True, width="stretch")
 
     st.subheader("Resource-allocation scenario")
-    available_visits = st.slider("Available barangay field visits", 1, len(affected), 4)
+    available_visits = st.slider(
+        "Available barangay field visits",
+        1,
+        len(affected),
+        4,
+        help="Sets how many highest-ranked barangays appear in the proposed field-visit sequence.",
+    )
     allocation = affected.head(available_visits)[["IPI Rank", "Barangay", "IPI", "Priority"]].copy()
     allocation["Proposed sequence"] = range(1, len(allocation) + 1)
     allocation["Purpose"] = "Field verification, current-condition assessment, and monitoring coordination"
@@ -499,9 +565,18 @@ with tab_decision:
 
     st.subheader("Custom priority scenario")
     w1, w2, w3 = st.columns(3)
-    frequency_weight = w1.slider("Frequency weight", 0, 100, 33)
-    area_weight = w2.slider("Affected-area weight", 0, 100, 33)
-    damage_weight = w3.slider("Damage weight", 0, 100, 34)
+    frequency_weight = w1.slider(
+        "Frequency weight", 0, 100, 33,
+        help="Explores how giving more emphasis to report frequency changes the ranking.",
+    )
+    area_weight = w2.slider(
+        "Affected-area weight", 0, 100, 33,
+        help="Explores how giving more emphasis to total affected area changes the ranking.",
+    )
+    damage_weight = w3.slider(
+        "Damage weight", 0, 100, 34,
+        help="Explores how giving more emphasis to mean percentage damage changes the ranking.",
+    )
     total_weight = frequency_weight + area_weight + damage_weight
     if total_weight == 0:
         st.warning("Set at least one weight above zero.")
@@ -523,6 +598,7 @@ with tab_decision:
 
 with tab_validation:
     st.header("Validation and Ranking Robustness")
+    st.caption("Purpose: Show the evidence used to check the data, calculations, and ranking stability.")
     st.subheader("Record-validation summary")
     validation = pd.DataFrame(
         [
@@ -599,6 +675,7 @@ with tab_validation:
 
 with tab_data:
     st.header("Data, Method, and Information Dissemination")
+    st.caption("Purpose: Make the barangay values, IPI method, downloadable summary, and limitations transparent.")
     st.subheader("Barangay dataset")
     display_df = df[["Barangay", "Report Frequency", "Affected Area (ha)", "Mean Damage (%)", "IPI", "Priority", "IPI Rank"]].copy()
     display_df["Report Frequency"] = display_df["Report Frequency"].astype(int)
@@ -610,6 +687,7 @@ with tab_data:
         data=display_df.to_csv(index=False).encode("utf-8"),
         file_name="aegis_barangay_summary_august_2025.csv",
         mime="text/csv",
+        help="Exports the displayed barangay summary for documentation or further checking.",
     )
 
     st.subheader("Index construction")
