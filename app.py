@@ -1,3 +1,4 @@
+import base64
 import json
 from pathlib import Path
 
@@ -24,6 +25,7 @@ STATIC_MAPS = {
     "Mean Percentage Damage": Path(__file__).with_name("assets") / "mean_damage_map.png",
     "Infestation Priority Index": Path(__file__).with_name("assets") / "ipi_priority_map.png",
 }
+PROJECT_COVER_B64 = Path(__file__).with_name("assets") / "aegis_project_cover.jpg.b64"
 
 st.markdown(
     """
@@ -49,6 +51,11 @@ def load_geojson():
     path = Path(__file__).with_name("norala_barangay.geojson")
     with path.open(encoding="utf-8") as handle:
         return json.load(handle)
+
+
+@st.cache_data
+def load_project_cover():
+    return base64.b64decode(PROJECT_COVER_B64.read_text(encoding="ascii"))
 
 
 def minmax(series):
@@ -242,6 +249,18 @@ with tab_overview:
     c2.metric("Reported affected area", f"{df['Affected Area (ha)'].sum():.2f} ha")
     c3.metric("Barangays with reports", f"{len(affected)} of {len(df)}")
     c4.metric("Highest monitoring priority", affected.iloc[0]["Barangay"], f"IPI {affected.iloc[0]['IPI']:.3f}")
+
+    st.subheader("AEGIS Project Cover")
+    cover_left, cover_center, cover_right = st.columns([1, 1.25, 1])
+    with cover_center:
+        st.image(
+            load_project_cover(),
+            caption=(
+                "AEGIS: Geospatial Analysis and Infestation Priority Index for Rice Stem Borer "
+                "Monitoring in Norala, South Cotabato | MCS-I"
+            ),
+            use_container_width=True,
+        )
 
     st.subheader("What the three indicators show")
     st.markdown(
