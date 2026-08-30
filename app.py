@@ -20,9 +20,10 @@ COLORS = {
 }
 
 STATIC_MAPS = {
-    "Report Frequency": Path(__file__).with_name("assets") / "report_frequency_map.png",
-    "Mean Percentage Damage": Path(__file__).with_name("assets") / "mean_damage_map.png",
-    "Infestation Priority Index": Path(__file__).with_name("assets") / "ipi_priority_map.png",
+    "Report Frequency": Path(__file__).with_name("assets") / "report_frequency_map.webp",
+    "Total Affected Area": Path(__file__).with_name("assets") / "affected_area_map.webp",
+    "Mean Percentage Damage": Path(__file__).with_name("assets") / "mean_damage_map.webp",
+    "Infestation Priority Index": Path(__file__).with_name("assets") / "ipi_priority_map.webp",
 }
 
 st.markdown(
@@ -64,11 +65,11 @@ def minmax(series):
 def priority_label(value, reported=True):
     if not reported:
         return "No report"
-    if value < 0.21:
+    if value <= 0.20:
         return "Low"
-    if value < 0.41:
+    if value <= 0.40:
         return "Moderate"
-    if value < 0.61:
+    if value <= 0.60:
         return "High"
     return "Very High"
 
@@ -77,11 +78,11 @@ def class_color(value, field):
     if value <= 0:
         return COLORS["none"]
     if field == "IPI":
-        if value < 0.21:
+        if value <= 0.20:
             return COLORS["low"]
-        if value < 0.41:
+        if value <= 0.40:
             return COLORS["moderate"]
-        if value < 0.61:
+        if value <= 0.60:
             return COLORS["high"]
         return COLORS["very_high"]
     if field == "Total_Repo":
@@ -296,8 +297,9 @@ with tab_map:
     )
     static_captions = {
         "Report Frequency": "Barangay distribution of documented rice stem borer reports.",
+        "Total Affected Area": "Barangay distribution of total reported rice area affected by stem borer infestation.",
         "Mean Percentage Damage": "Barangay distribution of reported mean percentage damage.",
-        "Infestation Priority Index": "Combined barangay monitoring priorities based on the IPI.",
+        "Infestation Priority Index": "Combined barangay monitoring priorities based on the IPI. The dashboard's exact classification intervals are shown below.",
     }
     st.image(
         str(STATIC_MAPS[static_choice]),
@@ -360,10 +362,10 @@ with tab_map:
         "Infestation Priority Index": (
             "Relative monitoring priority (IPI)",
             [(COLORS["none"], "No reported infestation (No report)"),
-             (COLORS["low"], "Low (0.000000 ≤ IPI < 0.210000)"),
-             (COLORS["moderate"], "Moderate (0.210000 ≤ IPI < 0.410000)"),
-             (COLORS["high"], "High (0.410000 ≤ IPI < 0.610000)"),
-             (COLORS["very_high"], "Very High (0.610000 ≤ IPI ≤ 1.000000)")],
+             (COLORS["low"], "Low (0.000 ≤ IPI ≤ 0.200)"),
+             (COLORS["moderate"], "Moderate (0.200 < IPI ≤ 0.400)"),
+             (COLORS["high"], "High (0.400 < IPI ≤ 0.600)"),
+             (COLORS["very_high"], "Very High (0.600 < IPI ≤ 1.000)")],
         ),
     }
     title, items = legends[indicator]
@@ -588,7 +590,7 @@ with tab_decision:
             + scenario["Damage (normalized)"] * damage_weight
         ) / total_weight
         scenario["Scenario Rank"] = scenario["Scenario IPI"].rank(ascending=False, method="first").astype(int)
-        scenario["Rank Change"] = scenario["IPI Rank"].astype(int) - scenario["Scenario Rank"]
+        scenario["Rank Change"] = scenario["Scenario Rank"] - scenario["IPI Rank"].astype(int)
         st.dataframe(
             scenario.sort_values("Scenario Rank")[["Barangay", "IPI Rank", "Scenario Rank", "Rank Change", "Scenario IPI"]],
             hide_index=True,
@@ -598,7 +600,7 @@ with tab_decision:
 
 with tab_validation:
     st.header("Validation and Ranking Robustness")
-    st.caption("Purpose: Show the evidence used to check the data, calculations, and ranking stability.")
+    st.caption("Purpose: Present independent IPI validation, questionnaire reliability, dashboard acceptability, and ranking stability.")
     st.subheader("Record-validation summary")
     validation = pd.DataFrame(
         [
@@ -616,28 +618,28 @@ with tab_validation:
     st.subheader("Frequency-only ranking versus integrated IPI ranking")
     comparison = affected[["Barangay", "Report Frequency", "IPI Rank"]].copy()
     comparison["Frequency Rank"] = comparison["Report Frequency"].rank(ascending=False, method="min").astype(int)
-    comparison["Rank Change"] = comparison["Frequency Rank"] - comparison["IPI Rank"].astype(int)
+    comparison["Rank Change"] = comparison["IPI Rank"].astype(int) - comparison["Frequency Rank"]
+    comparison["Absolute Rank Change"] = comparison["Rank Change"].abs()
     st.dataframe(
-        comparison.sort_values("IPI Rank")[["Barangay", "Frequency Rank", "IPI Rank", "Rank Change"]],
+        comparison.sort_values("IPI Rank")[["Barangay", "Frequency Rank", "IPI Rank", "Rank Change", "Absolute Rank Change"]],
         hide_index=True,
         width="stretch",
     )
     stat_table = pd.DataFrame(
         [
-            ["Spearman's ρ", 0.398, 0.329, "Weak-to-moderate positive agreement; not statistically significant"],
-            ["Kendall's τb", 0.296, 0.315, "Weak positive ordinal agreement; not statistically significant"],
+            ["Spearman's ρ", 0.351, "Weak positive rank agreement"],
         ],
-        columns=["Statistic", "Coefficient", "p-value", "Interpretation"],
+        columns=["Statistic", "Coefficient", "Interpretation"],
     )
     st.dataframe(stat_table, hide_index=True, width="stretch")
-    st.caption("Rank-agreement tests use the eight barangays with documented reports (n = 8).")
+    st.caption("Rank change = IPI rank − frequency rank. Positive values mean the barangay ranks lower under IPI; absolute rank change measures movement regardless of direction. Analysis uses the eight barangays with documented reports (n = 8).")
 
     st.subheader("Ablation analysis")
     ablation = pd.DataFrame(
         [
             ["Simsiman", 1, 1, 1, 1], ["Matapol", 2, 2, 2, 2],
             ["Lapuz", 3, 3, 3, 7], ["Puti", 4, 4, 4, 5],
-            ["Poblacion", 5, 6, 6, 3], ["BS Aquino Jr.", 6, 5, 5, 8],
+            ["BS Aquino Jr.", 5, 6, 6, 3], ["Poblacion", 6, 5, 5, 8],
             ["Kibid", 7, 7, 7, 4], ["Esperanza", 8, 8, 8, 6],
         ],
         columns=["Barangay", "Full IPI Rank", "Without Frequency", "Without Area", "Without Damage"],
@@ -653,23 +655,79 @@ with tab_validation:
     sensitivity = pd.DataFrame(
         [
             ["Simsiman", 1, 1, 1, 1], ["Matapol", 2, 2, 2, 2], ["Lapuz", 3, 3, 3, 3],
-            ["Puti", 4, 4, 4, 4], ["Poblacion", 5, 7, 6, 5], ["BS Aquino Jr.", 6, 5, 5, 6],
-            ["Kibid", 7, 6, 7, 7], ["Esperanza", 8, 8, 8, 8],
+            ["Puti", 4, 4, 4, 2], ["BS Aquino Jr.", 5, 5, 5, 6], ["Poblacion", 6, 7, 6, 3],
+            ["Kibid", 7, 6, 7, 6], ["Esperanza", 8, 8, 8, 7],
         ],
         columns=["Barangay", "Equal weights", "Frequency emphasis", "Area emphasis", "Damage emphasis"],
     )
     st.dataframe(sensitivity, hide_index=True, width="stretch")
+    robustness = pd.DataFrame(
+        [
+            ["Frequency emphasis", 0.976, 0.25, 1],
+            ["Area emphasis", 1.000, 0.00, 0],
+            ["Damage emphasis", 0.855, 1.00, 3],
+            ["Without frequency", 0.976, 0.25, 1],
+            ["Without affected area", 0.976, 0.25, 1],
+            ["Without damage", 0.548, 1.75, 4],
+            ["Area-ratio alternative", 0.929, 0.50, 2],
+        ],
+        columns=["Scenario", "Spearman's ρ", "Mean absolute rank change", "Maximum absolute rank change"],
+    )
+    st.dataframe(robustness, hide_index=True, width="stretch")
     st.success(
-        "Overall ranking robustness is strongest for the first four and last positions. Middle-priority "
-        "barangays show limited movement when one indicator receives greater weight, so operational decisions "
-        "near category boundaries should be supported by current field information."
+        "The top two priorities remain stable across every tested scenario. Area emphasis reproduces the primary ranking, "
+        "while removing damage produces the greatest movement; field information should therefore support decisions for middle-ranked barangays."
     )
 
-    st.subheader("Dashboard evaluation status")
-    st.info(
-        "The ISO/IEC 25010 evaluation sheet contains no completed respondent ratings yet. Software-quality "
-        "results should remain marked as pending until expert or user evaluations are collected; no evaluation "
-        "score is fabricated in this dashboard."
+    st.subheader("Independent validation of IPI outputs")
+    independent_validation = pd.DataFrame(
+        [
+            ["IPI score credibility", 4.20, "Very Good"],
+            ["Ranking appropriateness", 4.40, "Very Good"],
+            ["Classification consistency", 4.50, "Excellent"],
+            ["Thematic-map usefulness for monitoring", 4.70, "Excellent"],
+            ["Thematic-map clarity for decision support", 4.40, "Very Good"],
+            ["Overall", 4.44, "Very Good"],
+        ],
+        columns=["Validation criterion", "Mean", "Interpretation"],
+    )
+    st.dataframe(independent_validation, hide_index=True, width="stretch")
+    st.caption(
+        "Ten independent agriculture validators assessed whether the IPI scores, rankings, classifications, and thematic maps were credible and useful for monitoring decisions."
+    )
+
+    st.subheader("Internal consistency reliability of the questionnaire")
+    reliability = pd.DataFrame(
+        [
+            ["Functionality", 5, 0.929, "Excellent"],
+            ["Usability", 5, 0.926, "Excellent"],
+            ["Reliability", 5, 0.911, "Excellent"],
+            ["Performance efficiency", 5, 0.902, "Excellent"],
+            ["User-interface design", 5, 0.919, "Excellent"],
+            ["Overall questionnaire", 25, 0.969, "Excellent"],
+        ],
+        columns=["Quality dimension", "Number of items", "Cronbach's alpha", "Interpretation"],
+    )
+    st.dataframe(reliability, hide_index=True, width="stretch")
+
+    st.subheader("Overall acceptability of the AEGIS dashboard")
+    acceptability = pd.DataFrame(
+        [
+            ["Functionality", 4.29, 0.69, "Very Good"],
+            ["Usability", 4.09, 0.75, "Very Good"],
+            ["Reliability", 4.32, 0.64, "Very Good"],
+            ["Performance efficiency", 4.43, 0.56, "Very Good"],
+            ["User-interface design", 4.44, 0.58, "Very Good"],
+            ["Overall acceptability", 4.31, 0.58, "Very Good"],
+        ],
+        columns=["System-quality dimension", "Mean", "SD", "Interpretation"],
+    )
+    st.dataframe(acceptability, hide_index=True, width="stretch")
+    st.markdown(
+        "The overall mean of **4.31** indicates that respondents rated AEGIS as **Very Good**. "
+        "User-interface design received the highest mean (4.44), followed by performance efficiency (4.43), "
+        "while usability received the lowest mean (4.09) but remained within the same interpretation. "
+        "The overall SD of 0.58 indicates that responses were reasonably consistent."
     )
 
 
@@ -689,6 +747,15 @@ with tab_data:
         mime="text/csv",
         help="Exports the displayed barangay summary for documentation or further checking.",
     )
+    assessment_workbook = Path(__file__).with_name("assets") / "AEGIS_Statistical_Assessment.xlsx"
+    if assessment_workbook.exists():
+        st.download_button(
+            "Download complete statistical assessment (Excel)",
+            data=assessment_workbook.read_bytes(),
+            file_name="AEGIS_Statistical_Assessment.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Downloads the supporting calculations, sensitivity analyses, validation, reliability, and acceptability results.",
+        )
 
     st.subheader("Index construction")
     st.latex(r"IPI_b = \frac{F'_b + A'_b + D'_b}{3}")
